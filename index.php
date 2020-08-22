@@ -2,8 +2,22 @@
 
 require_once('./config.inc.php');
 
-$dateFrom = isset($_GET['dateFrom']) ? $_GET['dateFrom'] : date('Y-m-d');
-$dateTo = isset($_GET['dateTo']) ? $_GET['dateTo'] : date('Y-m-d');
+$fp = NULL; //fopen('./log/record_log.txt', 'a+'); do not open file if not needed
+function _log($msg){
+	global $fp;
+	global $_config;
+	
+	if($_config['log_enable'] === True){
+		if(!$fp) { $fp = fopen('./log/record_log.txt', 'a+'); }
+	
+		return fprintf($fp, date('Y-m-d H:i:s') . " - ".$_SERVER['REMOTE_ADDR']." - %s\n", $msg);
+	} else {
+		return True;
+	}
+}
+
+$dateFrom = isset($_GET['dateFrom']) ? $_GET['dateFrom'] : date('Y-m-d 07:00');
+$dateTo = isset($_GET['dateTo']) ? $_GET['dateTo'] : date('Y-m-d 19:00');
 
 
 if(isset($_GET['accuracy']) && $_GET['accuracy'] != '' && intval($_GET['accuracy']) > 0){
@@ -27,41 +41,40 @@ if(isset($_GET['trackerID']) && $_GET['trackerID'] != '' && strlen($_GET['tracke
 	<head>
 		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 		<link rel="icon" href="./img/favicon.ico" />
-
+		
 		<!-- JQUERY !-->
-		<script src="//code.jquery.com/jquery-3.3.1.min.js"></script>
-
+		<script src="./js/jquery-3.1.1.min.js"></script>
+		<script src="./js/jquery.datetimepicker.full.min.js"></script>
 		<!-- MOMENTS.JS !-->
-		<script src="//cdnjs.cloudflare.com/ajax/libs/moment.js/2.22.2/moment-with-locales.min.js"></script>
-
-		<!-- HIGHCHARTS.JS !-->
-		<script src="//code.highcharts.com/highcharts.src.js"></script>
-
+		<script src="./js/moment-with-locales.js"></script>
+		
 		<!-- BOOTSTRAP !-->
-		<script src="//cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.1.3/js/bootstrap.min.js" ></script>
-
+		<script src="./js/bootstrap.min.js" ></script>
+		
 		<!-- BOOTSTRAP DATETIMEPICKER !-->
-		<script src="//cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.8.0/js/bootstrap-datepicker.min.js"></script>
-		<script src="//cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.8.0/locales/bootstrap-datepicker.fr.min.js"></script>
-
+		<script src="./js/bootstrap-datepicker.js"></script>
+		<script src="./js/bootstrap-datepicker.fr.min.js"></script>
+				
 		<!-- LEAFLET.JS !-->
-		<script src="//cdnjs.cloudflare.com/ajax/libs/leaflet/1.3.4/leaflet.js"></script>
-		<script src="//cdn.jsdelivr.net/npm/leaflet-hotline@0.4.0/src/leaflet.hotline.min.js"></script>
-		<script src="//cdnjs.cloudflare.com/ajax/libs/Leaflet.awesome-markers/2.0.2/leaflet.awesome-markers.min.js"></script>
-
-		<script src="//cdnjs.cloudflare.com/ajax/libs/js-cookie/2.2.0/js.cookie.min.js"></script>
-
+		<script src="./js/leaflet.js"></script>
+		<script src="./js/leaflet.hotline.js"></script>
+		<script src="./js/leaflet.awesome-markers.min.js"></script>
+		
+		<script src="./js/js.cookie.js"></script>
+		
 		<!-- BOOTSTRAP !-->
-		<link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.1.3/css/bootstrap.min.css" />
-		<link rel="stylesheet" href="//getbootstrap.com/docs/3.3/dist/css/bootstrap.min.css" />
-
+		<link rel="stylesheet" href="./css/bootstrap.min.css" />
+		<link rel="stylesheet" href="./css/bootstrap-theme.min.css" />
+		
 		<!-- BOOTSTRAP DATETIMEPICKER !-->
-		<link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.8.0/css/bootstrap-datepicker.css" />
-
+		<link rel="stylesheet" href="./css/bootstrap-datepicker.css" />
+		<!-- JQUERY DATETIMEPICKER !-->
+		<link rel="stylesheet" href="./css/jquery.datetimepicker.min.css" />
+				
 		<!-- LEAFLET.JS !-->
-		<link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/leaflet/1.3.4/leaflet.css" />
-		<link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/Leaflet.awesome-markers/2.0.2/leaflet.awesome-markers.css" />
-
+		<link rel="stylesheet" href="./css/leaflet.css" />
+		<link rel="stylesheet" href="./css/leaflet.awesome-markers.css" />
+		
 		<style>
 			#mapid { height: 85%; }
 
@@ -70,7 +83,12 @@ if(isset($_GET['trackerID']) && $_GET['trackerID'] != '' && strlen($_GET['tracke
 		        cursor: default;
 		        opacity: 0.5;
 		    }
-		</style>
+			.tooltiptext{
+				background: transparent;
+				border: 0px;
+				box-shadow: none;
+				color: rgb(21, 8, 95);
+			}		</style>
 		<title>Your Own Tracks</title>
 	</head>
 	<body>
@@ -95,16 +113,16 @@ if(isset($_GET['trackerID']) && $_GET['trackerID'] != '' && strlen($_GET['tracke
 							<span class="hidden-xs">Config</span>
 							<span class="visible-xs"><span class="glyphicon glyphicon-cog"></span></span>
 						</a>
-
-						<a role="button" onclick="resetZoom();" class="btn btn-default">
+						
+						<a onclick="resetZoom();" class="btn btn-default">
 							<span class="hidden-xs">Reset view</span>
 							<span class="visible-xs"><span class="glyphicon glyphicon-screenshot"></span></span>
 						</a>
-						<a role="button" onclick="gotoDate();" class="btn btn-default" style="display: inline-block;" id="todayButton">
+						<a onclick="gotoDate();" class="btn btn-default" style="display: inline-block;" id="todayButton">
 							<span class="hidden-xs">Today</span>
 							<span class="visible-xs"><span class="glyphicon glyphicon-arrow-up"></span></span>
 						</a>
-						<a role="button" onclick="gotoDate(dateNextFrom, dateNextTo);" class="btn btn-primary" style="display: inline-block;" id="nextButton">
+						<a onclick="gotoDate(dateNextFrom, dateNextTo);" class="btn btn-primary" style="display: inline-block;" id="nextButton">
 							<span class="hidden-xs">Next</span>
 							<span class="visible-xs"><span class="glyphicon glyphicon-arrow-right"></span></span>
 						</a>
@@ -115,18 +133,18 @@ if(isset($_GET['trackerID']) && $_GET['trackerID'] != '' && strlen($_GET['tracke
 			  <div class="well">
 			  	<div class="row">
 			  		<div class="col-xs-2 text-left">
-					  	<a role="button" onclick="showHideMarkers();" class="btn btn-default" id="show_markers">
+					  	<a onclick="showHideMarkers();" class="btn btn-default" id="show_markers">
 							<span class="hidden-xs">Show markers</span>
 							<span class="visible-xs"><span class="glyphicon glyphicon-map-marker"></span></span>
 						</a>
 					</div>
 					<div class="col-xs-2 text-left">
-					  	<a role="button" onclick="setLiveMap();" class="btn btn-default" id="livemap_on">
+					  	<a onclick="setLiveMap();" class="btn btn-default" id="livemap_on">
 							<span class="hidden-xs">Live map</span>
 							<span class="visible-xs"><span class="glyphicon glyphicon-play-circle"></span></span>
 						</a>
 					</div>
-					<div class="col-xs-8 text-right">
+					<div class="col-xs-8 text-right">	
 						<form class="form-inline"><span class="hidden-xs">Accuracy : </span>
 						    <div class="input-group">
 						      <input type="number" size='4' class="form-control" id="accuracy" value="<?echo $accuracy; ?>" />
@@ -144,8 +162,7 @@ if(isset($_GET['trackerID']) && $_GET['trackerID'] != '' && strlen($_GET['tracke
 								<span class="visible-xs"><span class="glyphicon glyphicon-user"></span></span>
 							</div>
 							<select class="form-control" name="tracker_id" id="trackerID_selector" style="">
-						    	<option value="all"><?php echo $_config['default_trackerID']; ?></option>
-
+							<option value="all"><?php echo $_config['default_trackerID']; ?></option>
 							</select>
 						</div>
 					</div>
@@ -153,7 +170,135 @@ if(isset($_GET['trackerID']) && $_GET['trackerID'] != '' && strlen($_GET['tracke
 			  </div>
 			</div>
 			<script>
-				//app parameters vars
+				
+				function updateDateNav(_dateFrom, _dateTo){
+					console.log("updateDateNav : INIT");
+					
+
+					if(typeof _dateFrom == "undefined") { _dateFrom = dateFrom; }
+					if(typeof _dateTo == "undefined") { _dateTo = dateTo; }
+
+
+					diff = _dateTo.diff(_dateFrom, 'days');
+					//if(dateTo.isSame(dateFrom)){ diff = diff+1; }
+					
+					datePrevTo = moment(_dateFrom).subtract(1, 'days');;
+					datePrevFrom = moment(datePrevTo).subtract(diff, 'days');
+					
+					dateNextFrom = moment(_dateTo).add(1, 'days');
+					dateNextTo = moment(dateNextFrom).add(diff, 'days');
+					
+					//disable Next button
+					if(dateNextFrom.isAfter(moment())){
+						$('#nextButton').addClass('disabled');
+					}else{
+						$('#nextButton').removeClass('disabled');
+					}
+					
+					//disable today button
+					if(dateNextFrom.isSame(moment())){
+						$('#todayButton').addClass('disabled');
+						$('#livemap_on').removeClass('disabled');
+					}else{
+						$('#todayButton').removeClass('disabled');
+						$('#livemap_on').addClass('disabled');
+					}
+				}
+				
+				/**
+				* Adds two numbers
+				* @param {Number} a 
+				* @param {Number} a 
+				* @return {Number} sum
+				*/
+				function gotoDate(_dateFrom, _dateTo, pushState){
+					console.log("gotoDate : INIT");
+					
+					var _dateFrom = (typeof _dateFrom !== 'undefined') ? moment(_dateFrom) : moment();
+					var _dateTo = (typeof _dateTo !== 'undefined') ? moment(_dateTo) : moment();
+					var pushState = (typeof pushState !== 'undefined') ? pushState : true;
+					
+					dateFrom = _dateFrom;
+					dateTo = _dateTo;
+					
+					$('#dateFrom').val(moment(dateFrom).format('YYYY-MM-DD HH:mm'));
+					$('#dateTo').val(moment(dateTo).format('YYYY-MM-DD HH:mm'));
+					
+					
+					//push selected dates in window.history stack
+					if(pushState) { window.history.pushState(
+											{dateFrom: moment(dateFrom).format('YYYY-MM-DD HH:mm'), dateTo: moment(dateTo).format('YYYY-MM-DD HH:mm')},
+											'', 
+											window.location.pathname + '?dateFrom=' + moment(dateFrom).format('YYYY-MM-DD HH:mm') + '&dateTo=' + moment(dateTo).format('YYYY-MM-DD HH:mm')
+											); 
+									}
+
+					updateDateNav();
+
+					mapMarkers();
+					return false;
+				}
+				
+				/**
+				* Adds two numbers
+				* @return {Number} sum
+				*/
+				function gotoAccuracy(){
+					console.log("gotoAccuracy : INIT");
+					
+					var _accuracy = parseInt($('#accuracy').val());
+					
+					if(_accuracy != accuracy){
+						
+						Cookies.set('accuracy', _accuracy);
+						console.log("Accuracy cookie = " + Cookies.get('accuracy'));
+						
+						//location.href='./?dateFrom='+moment(dateFrom).format('YYYY-MM-DD') + '&dateTo=' + moment(dateTo).format('YYYY-MM-DD') + '&accuracy=' + _accuracy + '&trackerID=' + trackerID;
+
+						accuracy = _accuracy;
+
+						mapMarkers();
+
+					}else{
+						$('#configCollapse').collapse('hide');
+					}
+					return false;
+				}
+
+				/**
+				* Adds two numbers
+				* @return {Number} sum
+				*/
+				function changeTrackerID(){
+					console.log("changeTrackerID : INIT");
+					
+					var _trackerID = $('#trackerID_selector').val();
+					
+					if(_trackerID != trackerID){
+						
+						Cookies.set('trackerID', _trackerID);
+						console.log("changeTrackerID : INFO trackerID cookie = " + Cookies.get('trackerID'));
+						
+						trackerID = _trackerID;
+						drawMap();
+
+					}else{
+						$('#configCollapse').collapse('hide');
+					}
+					return false;
+
+				}
+				
+				function handlePopState(event){
+					console.log("handlePopState : INIT");
+					console.log(event);
+					
+					return gotoDate(event.state.dateFrom, event.state.dateTo, false);
+					
+				}
+				
+				
+				//datetimepicker setup
 				var dateFrom;
 				var dateTo;
 				var accuracy;
@@ -163,8 +308,100 @@ if(isset($_GET['trackerID']) && $_GET['trackerID'] != '' && strlen($_GET['tracke
 				var dateNextTo;
 				var trackerID;
 				var trackerIDs = [];
+				
+				/**
+				* Adds two numbers
+				* @param {Number} a 
+				*/
+				function initUI(){
+					console.log("initUI : INIT");
+					
+					
+					dateTo = moment('<?php echo $dateTo; ?>');
+					dateFrom = moment('<?php echo $dateFrom; ?>');
+					
+					
+					//date params event handlers
+					updateDateNav();
+					$('#dateFrom').datetimepicker({
+						i18n:{
+						nl:{
+						months:[
+							'januari','februari','maart','april',
+							'mei','juni','juli','uugustus',
+							'september','oktober','november','december',
+						],
+						dayOfWeek:[
+							"Zo.", "Ma", "Di", "Wo", 
+							"Do", "Vr", "Za.",
+						]
+						}
+						},
+						timepicker:true,
+						format:'Y-m-d H:i'
+					});
+					$('#dateTo').datetimepicker({
+						i18n:{
+						nl:{
+						months:[
+							'januari','februari','maart','april',
+							'mei','juni','juli','uugustus',
+							'september','oktober','november','december',
+						],
+						dayOfWeek:[
+							"Zo.", "Ma", "Di", "Wo", 
+							"Do", "Vr", "Za.",
+						]
+						}
+						},
+						timepicker:true,
+						format:'Y-m-d H:i'
+					});
+					
+					//$('#dateTo').datetimepicker().on('hide', function(e) {
+				    //    return gotoDate($('#dateFrom').val(), $('#dateTo').val());
+				    //});
+					$('#dateFrom').change(function(){
+						gotoDate($('#dateFrom').val(), $('#dateTo').val());
+					});
+					$('#dateTo').change(function(){
+						gotoDate($('#dateFrom').val(), $('#dateTo').val());
+					});
+					//accuracy event handlers
+					accuracy = <?php echo $accuracy; ?>;
+					$('#accuracy').change(function(){
+						gotoAccuracy();
+					});
+					$('#accuracySubmit').click(function(){
+						gotoAccuracy();
+					});
+					
+					
+					//trackerID event handlers
+					trackerID = "<?php echo $trackerID; ?>";
 
-				// map management vars
+					$('#trackerID_selector').change(function(){
+						changeTrackerID();
+					});
+
+					$('#configCollapse').on('show.bs.collapse', function (e) {
+					    $('#configButton').removeClass( "btn-default" ).addClass( "btn-primary" ).addClass( "active" );
+					})
+					$('#configCollapse').on('hide.bs.collapse', function (e) {
+					    $('#configButton').addClass( "btn-default" ).removeClass( "btn-primary" ).removeClass( "active" );
+					})
+					
+					//setup history popupstate event handler
+					window.onpopstate = handlePopState;
+				}
+				
+			</script>
+		</div>
+		<div class="container">
+			
+			<div id="mapid"></div>
+			<script>
+				
 				var i;
 				var map_drawn = false;
 				var show_markers;
@@ -183,75 +420,18 @@ if(isset($_GET['trackerID']) && $_GET['trackerID'] != '' && strlen($_GET['tracke
 				var marker_finish_icons = [];
 				var marker_icons = [];
 
-
-
-
-///// INIT
+				
 				$( document ).ready(function() {
-					initApp();
-				});
-
-				function initApp(){
 					initUI();
 					initMap();
-					initCharts();
-				}
-
-				function initUI(){
-					console.log("initUI : INIT");
-
-
-					dateTo = moment('<?php echo $dateTo; ?>');
-					dateFrom = moment('<?php echo $dateFrom; ?>');
-
-
-
-
-					$('.input-daterange').datepicker({
-						format: 'yyyy-mm-dd',
-						language: 'fr',
-						endDate: '0d',
-					});
-
-					$('.input-daterange').datepicker().on('hide', function(e) {
-				        return gotoDate($('#dateFrom').val(), $('#dateTo').val());
-				    });
-
-					//accuracy event handlers
-					accuracy = <?php echo $accuracy; ?>;
-					$('#accuracy').change(function(){
-						gotoAccuracy();
-					});
-					$('#accuracySubmit').click(function(){
-						gotoAccuracy();
-					});
-
-
-					//trackerID event handlers
-					trackerID = "<?php echo $trackerID; ?>";
-
-					$('#trackerID_selector').change(function(){
-						gotoTrackerID();
-					});
-
-					$('#configCollapse').on('show.bs.collapse', function (e) {
-					    $('#configButton').removeClass( "btn-default" ).addClass( "btn-primary" ).addClass( "active" );
-					})
-					$('#configCollapse').on('hide.bs.collapse', function (e) {
-					    $('#configButton').addClass( "btn-default" ).removeClass( "btn-primary" ).removeClass( "active" );
-					})
-
-					//setup history popupstate event handler
-					window.onpopstate = handlePopState;
-				}
+				});
 
 				/**
-				* initiate map config and fire getMarkers function
-				* fired once on document.ready
+				* Adds two numbers
 				*/
 				function initMap(){
 					console.log("initMap : INIT");
-
+					
 					show_markers = Cookies.get('show_markers');
 					console.log("initMap : INFO show_markers = " + show_markers);
 
@@ -260,230 +440,145 @@ if(isset($_GET['trackerID']) && $_GET['trackerID'] != '' && strlen($_GET['tracke
 					marker_start_icons[2] = L.AwesomeMarkers.icon({icon: 'play', markerColor: 'orange', iconColor: 'green' });
 					marker_start_icons[3] = L.AwesomeMarkers.icon({icon: 'play', markerColor: 'green', iconColor: 'darkgreen' });
 					marker_start_icons[4] = L.AwesomeMarkers.icon({icon: 'play', markerColor: 'purple', iconColor: 'green' });
-					marker_start_icons[5] = L.AwesomeMarkers.icon({icon: 'play', markerColor: 'cadetblue', iconColor: 'green' });
-					marker_start_icons[6] = L.AwesomeMarkers.icon({icon: 'play', markerColor: 'darkred', iconColor: 'green' });
+					marker_start_icons[5] = L.AwesomeMarkers.icon({icon: 'play', markerColor: 'darkyellow', iconColor: 'green' });
+					marker_start_icons[6] = L.AwesomeMarkers.icon({icon: 'play', markerColor: 'grey', iconColor: 'green' });
 					marker_start_icons[7] = L.AwesomeMarkers.icon({icon: 'play', markerColor: 'darkgreen', iconColor: 'green' });
-					marker_start_icons[8] = L.AwesomeMarkers.icon({icon: 'play', markerColor: 'darkpuple', iconColor: 'green' });
-
-				    marker_finish_icons[0] = L.AwesomeMarkers.icon({icon: 'stop', markerColor: 'blue', iconColor: 'red' });
+					marker_start_icons[8] = L.AwesomeMarkers.icon({icon: 'play', markerColor: 'darkpurple', iconColor: 'green' });
+					
+				        marker_finish_icons[0] = L.AwesomeMarkers.icon({icon: 'stop', markerColor: 'blue', iconColor: 'red' });
 					marker_finish_icons[1] = L.AwesomeMarkers.icon({icon: 'stop', markerColor: 'red', iconColor: 'darkred' });
 					marker_finish_icons[2] = L.AwesomeMarkers.icon({icon: 'stop', markerColor: 'orange', iconColor: 'red' });
 					marker_finish_icons[3] = L.AwesomeMarkers.icon({icon: 'stop', markerColor: 'green', iconColor: 'red' });
 					marker_finish_icons[4] = L.AwesomeMarkers.icon({icon: 'stop', markerColor: 'purple', iconColor: 'red' });
-					marker_finish_icons[5] = L.AwesomeMarkers.icon({icon: 'stop', markerColor: 'cadetblue', iconColor: 'red' });
-					marker_finish_icons[6] = L.AwesomeMarkers.icon({icon: 'stop', markerColor: 'darkred', iconColor: 'red' });
+					marker_finish_icons[5] = L.AwesomeMarkers.icon({icon: 'stop', markerColor: 'yellow', iconColor: 'red' });
+					marker_finish_icons[6] = L.AwesomeMarkers.icon({icon: 'stop', markerColor: 'grey', iconColor: 'red' });
 					marker_finish_icons[7] = L.AwesomeMarkers.icon({icon: 'stop', markerColor: 'darkgreen', iconColor: 'red' });
-					marker_finish_icons[8] = L.AwesomeMarkers.icon({icon: 'stop', markerColor: 'darkpuple', iconColor: 'red' });
-
-				    marker_icons[0] = L.AwesomeMarkers.icon({icon: 'user', markerColor: 'blue' });
-					marker_icons[1] = L.AwesomeMarkers.icon({icon: 'user', markerColor: 'red' });
-					marker_icons[2] = L.AwesomeMarkers.icon({icon: 'user', markerColor: 'orange' });
-					marker_icons[3] = L.AwesomeMarkers.icon({icon: 'user', markerColor: 'green' });
-					marker_icons[4] = L.AwesomeMarkers.icon({icon: 'user', markerColor: 'purple' });
-					marker_icons[5] = L.AwesomeMarkers.icon({icon: 'user', markerColor: 'cadetblue' });
-					marker_icons[6] = L.AwesomeMarkers.icon({icon: 'user', markerColor: 'darkred' });
-					marker_icons[7] = L.AwesomeMarkers.icon({icon: 'user', markerColor: 'darkgreen' });
-					marker_icons[8] = L.AwesomeMarkers.icon({icon: 'user', markerColor: 'darkpuple' });
-
+					marker_finish_icons[8] = L.AwesomeMarkers.icon({icon: 'stop', markerColor: 'darkpurple', iconColor: 'red' });
+					
+				        marker_icons[0] = L.circle({color: 'steelblue', radius: 1000, fillColor: 'steelblue', opacity: 0.7});
+					marker_icons[1] = L.circle({color: 'red', radius: 1000, fillColor: 'red', opacity: 0.7});
+					marker_icons[2] = L.circle({color: 'orange', radius: 1000, fillColor: 'darkorange', opacity: 0.7});
+					marker_icons[3] = L.circle({color: 'green', radius: 1000, fillColor: 'green', opacity: 0.7});
+					marker_icons[4] = L.circle({color: 'purple', radius: 1000, fillColor: 'darkpink', opacity: 0.7});
+					marker_icons[5] = L.circle({color: 'yellow', radius: 1000, fillColor: 'darkyellow', opacity: 0.7});
+					marker_icons[6] = L.circle({color: 'grey', radius: 1000, fillColor: 'white', opacity: 0.7});
+					marker_icons[7] = L.circle({color: 'green', radius: 1000, fillColor: 'darkgreen', opacity: 0.7});
+					marker_icons[8] = L.circle({color: 'darkpurple', radius: 1000, fillColor: 'darkpurple', opacity: 0.7});
+					
 				    //set checkbox
 				    if(show_markers == '1'){
 				    	//hideMarkers();
 						//$('#show_markers').prop('checked',false);
 						$('#show_markers').removeClass( "btn-default" ).addClass( "btn-primary" ).addClass( "active" );
 				    }
-
+					
 					mymap = L.map('mapid').setView([48.866667, 2.333333], 11);
-
+					
 					L.tileLayer( 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 					    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
 					    subdomains: ['a','b','c']
 					}).addTo( mymap );
-
-					getMarkers();
-
+					
+					mapMarkers();
+					
 				}
 
-				function initCharts(){
+				function setDefaultZoom(){
+					console.log("setDefaultZoom : INIT");
 
+					setTimeout(function() {
+						default_zoom = mymap.getZoom();
+						default_center = mymap.getCenter();
+					}, 2000);
+					
 				}
-
-///// EVENT HANDLERS
+				
 				/**
-				* handles navigation to another date range
+				* Adds two numbers
 				*/
-				function gotoDate(_dateFrom, _dateTo, pushState){
-					console.log("gotoDate : INIT");
-
-					var _dateFrom = (typeof _dateFrom !== 'undefined') ? moment(_dateFrom) : moment();
-					var _dateTo = (typeof _dateTo !== 'undefined') ? moment(_dateTo) : moment();
-					var pushState = (typeof pushState !== 'undefined') ? pushState : true;
-
-					dateFrom = _dateFrom;
-					dateTo = _dateTo;
-
-					$('#dateFrom').val(moment(dateFrom).format('YYYY-MM-DD'));
-					$('#dateTo').val(moment(dateTo).format('YYYY-MM-DD'));
-
-
-					//push selected dates in window.history stack
-					if(pushState) { window.history.pushState(
-							{dateFrom: moment(dateFrom).format('YYYY-MM-DD'), dateTo: moment(dateTo).format('YYYY-MM-DD')},
-							'',
-							window.location.pathname + '?dateFrom=' + moment(dateFrom).format('YYYY-MM-DD') + '&dateTo=' + moment(dateTo).format('YYYY-MM-DD')
-							);
-					}
+				function mapMarkers(){
+					console.log("mapMarkers : INIT");
 
 					getMarkers();
-					return false;
 				}
 
 				/**
 				* Adds two numbers
-				* @return {Number} sum
 				*/
-				function gotoAccuracy(){
-					console.log("gotoAccuracy : INIT");
+				function getMarkers(){
+					console.log("getMarkers : INIT");
+					
+					//ajax call to get list of markers
+					$.ajax({ 
+				        url: 'rpc.php',
+				        data: {
+				        	'dateFrom': dateFrom.format('YYYY-MM-DD HH:mm'),
+				        	'dateTo': dateTo.format('YYYY-MM-DD HH:mm'),
+				        	'accuracy': accuracy,
+				        	//'trackerID' : trackerID,
+				        	//'epoc': time(),
+				        	'action': 'getMarkers'
+				        },
+				        type: 'GET',
+        				dataType: 'json',
+        				beforeSend: function(xhr)
+        				{
+        					$('#mapid').css('filter','blur(5px)');
+        				},
+				        success: function(data, status)
+				        {
+				            if(data.status){
+						        
 
-					var _accuracy = parseInt($('#accuracy').val());
+								
 
-					if(_accuracy != accuracy){
+								jsonMarkers = JSON.parse(data.markers);
 
-						Cookies.set('accuracy', _accuracy);
-						console.log("Accuracy cookie = " + Cookies.get('accuracy'));
-
-						//location.href='./?dateFrom='+moment(dateFrom).format('YYYY-MM-DD') + '&dateTo=' + moment(dateTo).format('YYYY-MM-DD') + '&accuracy=' + _accuracy + '&trackerID=' + trackerID;
-
-						accuracy = _accuracy;
-
-						getMarkers();
-
-					}else{
-						$('#configCollapse').collapse('hide');
-					}
-					return false;
+								updateTrackerIDs(jsonMarkers);
+								
+								if(drawMap(jsonMarkers)){ $('#mapid').css('filter','blur(0px)'); }
+								
+				        	}else{
+				        		console.log("getMarkers : ERROR Status : " + status);
+				        		console.log("getMarkers : ERROR Data : ");
+				        		console.log(data);
+				        	}
+				        },
+				        error: function(xhr, desc, err) {
+					        console.log(xhr);
+					        console.log("getMarkers : ERROR Details: " + desc + "\nError:" + err);
+				        }
+				    });
+					
 				}
-
-				/**
-				* reset map on tracker ID change
-				*/
-				function gotoTrackerID(){
-					console.log("gotoTrackerID : INIT");
-
-					var _trackerID = $('#trackerID_selector').val();
-
-					if(_trackerID != trackerID){
-
-						Cookies.set('trackerID', _trackerID);
-						console.log("gotoTrackerID : INFO trackerID cookie = " + Cookies.get('trackerID'));
-
-						trackerID = _trackerID;
-						drawMap();
-
-					}else{
-						$('#configCollapse').collapse('hide');
-					}
-					return false;
-
-				}
-
-				function handlePopState(event){
-					console.log("handlePopState : INIT");
-					console.log(event);
-
-					return gotoDate(event.state.dateFrom, event.state.dateTo, false);
-
-				}
-
-				/**
-				* Sets up the live update of new recorded markers
-				*/
-				function setLiveMap(){
-					console.log("setLiveMap : INIT");
-					live_view = !live_view;
-
-					if(live_view){
-						live_view_timer = setTimeout(getMarkers(), 3000);
-						$('#livemap_on').removeClass( "btn-default" ).addClass( "btn-primary" ).addClass( "active" );
-
-					}else{
-						clearTimeout(live_view_timer);
-						$('#livemap_on').addClass( "btn-default" ).removeClass( "btn-primary" ).removeClass( "active" );
-					}
-				}
-
-
-
-///// UI HANDLERS
-				/**
-				* updates config bar UI based on user params
-				*/
-				function updateNavbarUI(_dateFrom, _dateTo){
-					console.log("updateNavbarUI : INIT");
-
-
-					if(typeof _dateFrom == "undefined") { _dateFrom = dateFrom; }
-					if(typeof _dateTo == "undefined") { _dateTo = dateTo; }
-
-
-					diff = _dateTo.diff(_dateFrom, 'days');
-					//if(dateTo.isSame(dateFrom)){ diff = diff+1; }
-
-					datePrevTo = moment(_dateFrom).subtract(1, 'days');
-					datePrevFrom = moment(datePrevTo).subtract(diff, 'days');
-
-					dateNextFrom = moment(_dateTo).add(1, 'days');
-					dateNextTo = moment(dateNextFrom).add(diff, 'days');
-
-					//disable Next button
-					if(dateNextFrom.isAfter(moment())){
-						$('#nextButton').addClass('disabled');
-					}else{
-						$('#nextButton').removeClass('disabled');
-					}
-
-					//disable today button
-					if(dateNextFrom.isSame(moment())){
-						$('#todayButton').addClass('disabled');
-						$('#livemap_on').removeClass('disabled');
-					}else{
-						$('#todayButton').removeClass('disabled');
-						$('#livemap_on').addClass('disabled');
-					}
-				}
-
-				/*
-				* UI update
-				* updates tracker ID selection dropdown list from config
-				*
-				*/
 
 				function updateTrackerIDs(_tid_markers){
 					console.log("updateTrackerIDs : INIT");
-
+					
 					try{
 						$("#trackerID_selector option[value!='<?php echo $_config['default_trackerID']; ?>']").each(function() {
 						    $(this).remove();
 						});
-
+	
 						if(typeof _tid_markers != "undefined" && _tid_markers != null) {
-							trackerIDs = Object.keys(_tid_markers);
-
+							trackerIDs = Object.keys(_tid_markers); 
+							
 							$.each(trackerIDs, function( index, value ) {
 								$('#trackerID_selector').append($('<option>', {
 								    value: value,
 								    text: value
 								}));
 							});
-
+		
 							$("#trackerID_selector").val(trackerID);
-
-
+							
+							
 						}else{
 							console.log("updateTrackerIDs : INFO no trackerID found in markers json");
 					    	return ;
 						}
-
-
+	
+						
 					}catch(err) {
 					    console.log("updateTrackerIDs : ERROR " + err.message);
 					    alert( err.message );
@@ -491,16 +586,16 @@ if(isset($_GET['trackerID']) && $_GET['trackerID'] != '' && strlen($_GET['tracke
 
 
 				}
-
+				
 				/**
 				* Draws a set of location tracks per tid in _tid_markers array
-				* @param {Array} _tid_markers
+				* @param {Array} _tid_markers 
 				*/
 				function drawMap(_tid_markers){
 					console.log("drawMap : INIT");
-
+					
 					try{
-						if((typeof _tid_markers == "undefined" || _tid_markers == null) && typeof tid_markers != "undefined" && tid_markers != null) {
+						if(typeof _tid_markers == "undefined" && typeof tid_markers != "undefined" && tid_markers != null) {
 							_tid_markers = tid_markers;
 							console.log("drawMap : INFO null param given but global markers available !");
 						}else if(typeof _tid_markers != "undefined" && _tid_markers != null) {
@@ -508,48 +603,48 @@ if(isset($_GET['trackerID']) && $_GET['trackerID'] != '' && strlen($_GET['tracke
 							console.log("drawMap : INFO non null param given !");
 						}else{
 							console.log("drawMap : ERROR null param given and global markers not available !");
-							alert('No location markers collected for selected dates and accuracy !');
+							alert('Geen markers gevonden voor geselecteerde datum-tijd en nauwkeurigheid');
 							return;
 						}
-
+						
 						console.log("drawMap : INFO tid_markers = ");
 						console.log(tid_markers);
-
+	
 						//vars for map bounding
 						max_lat = -1000;
 						min_lat = 1000;
 						max_lon = -1000;
 						min_lon = 1000;
-
+	
 						if(map_drawn){ eraseMap(); }
-
+	
 						nb_markers=0; // global markers counter
 						trackerIDs = Object.keys(_tid_markers);
-
+	
 						tid_markers = []; // markers collected from json
 						my_markers = [];
 						my_latlngs = [];
 						polylines = [];
-
-
+	
+	
 						if(trackerIDs.length > 0){
-
-
+	
+							
 							for ( j=0; j < trackerIDs.length; ++j ){
-
-
+								
+	
 								tid = trackerIDs[j];
 								markers = _tid_markers[tid];
 								my_latlngs[tid] = [];
 								my_markers[tid] = [];
-
+	
 								if(trackerID == "<?php echo $_config['default_trackerID']; ?>" || trackerID == tid){
-
+	
 									var trackerIDString = '<br/>TrackerID : ' + tid;
-
+									
 									if(markers.length > 0){
 										for ( i=0; i < markers.length; ++i ) {
-
+										
 										   	nb_markers = nb_markers+1;
 										   	dateString = markers[i].dt;
 											if(markers[i].epoch != 0){
@@ -557,56 +652,69 @@ if(isset($_GET['trackerID']) && $_GET['trackerID'] != '' && strlen($_GET['tracke
 												newDate.setTime(markers[i].epoch * 1000);
 												dateString = newDate.toLocaleString();
 											}
-
-											var accuracyString = '<br/>Accuracy : ' + markers[i].accuracy + ' m';
+											
+											var accuracyString = '<br/>Nauwkeurigheid : ' + markers[i].accuracy + ' m';
 											var headingString = "";
 											var velocityString = "";
 											var locationString = "";
-											if(markers[i].heading != null) headingString = '<br/>Heading : ' + markers[i].heading + ' °';
-											if(markers[i].velocity != null) velocityString = '<br/>Velocity : ' + markers[i].velocity + ' km/h';
+											var batteryString ="";
+											if(markers[i].heading != null) headingString = '<br/>Richting : ' + markers[i].heading + ' °';
+											if(markers[i].velocity != null) velocityString = '<br/>Snelheid : ' + markers[i].velocity + ' km/h';
 											if(markers[i].display_name != null){
-												locationString = "<br/>Location : <a role='button' onclick='showBoundingBox("+ i +");' title='Show location bounding box' >" + markers[i].display_name + '</a>';
+												locationString = "<br/>Locatie : <a href='javascript:showBoundingBox("+ i +");' title='Show location bounding box' >" + markers[i].display_name + '</a>';
 											}else{
-												locationString = "<br/>Location : <span id='loc_"+ i +"'><a role='button' onclick='geodecodeMarker("+ i +");' title='Get location (geodecode)'>Get location</a></span>";
+												locationString = "<br/>Locatie : <span id='loc_"+ i +"'><a href='javascript:geodecodeMarker("+ i +");' title='Get location (geodecode)'>Haal locatie op</a></span>";
 											}
-
-											removeString = "<br/><br/><a href=\"#\" onclick=\"deleteMarker('"+ tid +"', "+ i +");\">Delete marker</a>";
-
+											if(markers[i].battery_level != null) batteryString = '<br/>Batterijpercentage : ' + markers[i].battery_level + ' %'; 
+											removeString = "<br/><br/><a href=\"javascript:deleteMarker('"+ tid +"', "+ i +");\">Verwijder registratiepunt</a>";
+											
 											//prepare popup HTML code for marker
-											popupString = dateString + trackerIDString + accuracyString + headingString + velocityString + locationString + removeString;
-
+											popupString = dateString + trackerIDString + batteryString + accuracyString + headingString + velocityString + locationString + removeString;
+										   	
+											var text = L.tooltip({
+												permanent: true,
+												direction: 'center',
+												className: 'tooltiptext'
+											})
+											.setContent(markers[i].tracker_id)
+											.setLatLng([markers[i].latitude, markers[i].longitude]);
+																						
+										   	
 										   	//create leaflet market object with custom icon based on tid index in array
 									   		//first marker
 									   		if(i == 0){
 									   			my_marker = L.marker( [markers[i].latitude, markers[i].longitude], {icon: marker_start_icons[j]} ).bindPopup(popupString);
-									   		//last marker
+												//my_marker.bindTooltip(text);   
+									   		//last marker					   			
 									   		}else if(i == markers.length-1){
-									   			my_marker = L.marker( [markers[i].latitude, markers[i].longitude], {icon: marker_finish_icons[j]} ).bindPopup(popupString);
-									   		//all other markers
+									   			my_marker = L.marker( [markers[i].latitude, markers[i].longitude], {icon: marker_finish_icons[j]} ).bindPopup(popupString);	
+												//my_marker.bindTooltip(text); 
+									   		//all other markers				   			
 									   		}else{
-									   			my_marker = L.marker( [markers[i].latitude, markers[i].longitude], {icon: marker_icons[j]} ).bindPopup(popupString);
+									   			my_marker = L.circle( [markers[i].latitude, markers[i].longitude],{radius: markers[i].accuracy},{options: marker_icons[j] }).bindPopup(popupString);
+												my_marker.bindTooltip(text); 
 									   		}
-
+	
 									   		if(max_lat < markers[i].latitude) { max_lat = markers[i].latitude; }
 									   		if(min_lat > markers[i].latitude) { min_lat = markers[i].latitude; }
 									   		if(max_lon < markers[i].longitude) { max_lon = markers[i].longitude; }
 									   		if(min_lon > markers[i].longitude) { min_lon = markers[i].longitude; }
-
+									   		
 									   		//add marker to map only if cookie 'show_markers' says to or if 1st or last marker
 									   		if(show_markers != '0' || i == 0 || i == markers.length-1){
-									   			my_marker.addTo( mymap );
+									   			my_marker.addTo( mymap );					   			
 									   		}
 									   		/*
 									   		//default show popup for last marker of track
 									   		if(i == markers.length-1){
-									   			my_marker.addTo( mymap ).openPopup();;
+									   			my_marker.addTo( mymap ).openPopup();;					   			
 									   		}
 									   		*/
-
+	
 									   		//collect all markers location to prepare drawing track, per trackerID
 									   		my_latlngs[tid][i] = [markers[i].latitude, markers[i].longitude, i];
-
-
+									   		
+									   		
 									   		//todo : onmouseover marker, display accuracy radius
 									   		//if(markers[i].acc > 0){
 										   /*
@@ -617,10 +725,10 @@ if(isset($_GET['trackerID']) && $_GET['trackerID'] != '' && strlen($_GET['tracke
 												}).addTo(mymap);
 										   }
 										   */
-
+	
 										   //array of all markers for display / hide markers + initial auto zoom scale
 										   my_markers[tid][i] = my_marker;
-
+										   
 										}
 
 										//var polylines[tid] = L.polyline(my_latlngs[tid]).addTo(mymap);
@@ -636,71 +744,61 @@ if(isset($_GET['trackerID']) && $_GET['trackerID'] != '' && strlen($_GET['tracke
 												outlineColor: '#000000',
 												outlineWidth: 0.5
 										}).addTo(mymap);
-
+	
 									}else{
 										console.log("drawMap : ERROR No location data for trackerID '" + trackerID + "' found !");
-										alert('No location data for trackerID \'' + trackerID + '\' found !');
+										alert('Geen records binnen deze tijd gevonden voor \'' + trackerID + '\' ');
 									}
-
-
+	
+	
 								}
-
-
+	
+	
 							}
-
-
-
-
-
+							
+							
+						
+							
+	
 						}else{
 							console.log("drawMap : ERROR No location data found for any trackerID !");
-							alert('No location data found for any trackerID !');
+							alert('Geen records binnen deze tijd gevonden');
 						}
-
+	
 						//save default zoom scale
 						setDefaultZoom();
-
+	
 						//auto zoom scale based on all markers location
 						mymap.fitBounds([
 						    [min_lat, min_lon],
 						    [max_lat, max_lon]
 						]);
-
+						
 						//set map drawn flag
 						map_drawn = true;
-
+						
 						return true;
-
+						
 					}catch(err) {
 					    console.log("drawMap : ERROR " + err.message);
 						alert( err.message );
 						map_drawn = false;
 						return false;
 					}
-
-
+					
+					
 				}
-
-				function setDefaultZoom(){
-					console.log("setDefaultZoom : INIT");
-
-					setTimeout(function() {
-						default_zoom = mymap.getZoom();
-						default_center = mymap.getCenter();
-					}, 2000);
-
-				}
-
+				
 				/**
-				* Clears all markers on current map
+				* Adds two numbers
 				*/
 				function eraseMap(){
 					console.log("eraseMap : INIT");
-
+					
 					$.each(trackerIDs, function(_index, _tid){
 						if(_tid in polylines) { polylines[_tid].removeFrom(mymap); }
 				    });
-
+					
 					$.each(trackerIDs, function(_index, _tid){
 
 						//if(trackerID == _tid || trackerID == "<?php echo $_config['default_trackerID']; ?>"){
@@ -708,21 +806,38 @@ if(isset($_GET['trackerID']) && $_GET['trackerID'] != '' && strlen($_GET['tracke
 							$.each(my_markers[_tid], function(_index2, _marker){
 
 								_marker.remove();
-
+							
 							});
 						//}
 
 					});
-
+					
 					return true;
 				}
-
+				
 				/**
-				* Displays Icons for each marker
+				* Adds two numbers
+				*/
+				function setLiveMap(){
+					console.log("setLiveMap : INIT");
+					live_view = !live_view;
+					
+					if(live_view){
+						live_view_timer = setTimeout(getMarkers(), 3000);
+						$('#livemap_on').removeClass( "btn-default" ).addClass( "btn-primary" ).addClass( "active" );
+						
+					}else{
+						clearTimeout(live_view_timer);
+						$('#livemap_on').addClass( "btn-default" ).removeClass( "btn-primary" ).removeClass( "active" );
+					}
+				}
+				
+				/**
+				* Adds two numbers
 				*/
 				function showMarkers(){
 					console.log("showMarkers : INIT");
-
+					
 					$.each(trackerIDs, function(_index, _tid){
 
 						if(trackerID == _tid || trackerID == "<?php echo $_config['default_trackerID']; ?>"){
@@ -739,9 +854,8 @@ if(isset($_GET['trackerID']) && $_GET['trackerID'] != '' && strlen($_GET['tracke
 					});
 					return true;
 				}
-
 				/**
-				* Hide icons for each markers except 1st & last
+				* Adds two numbers
 				*/
 				function hideMarkers(){
 					console.log("hideMarkers : INIT");
@@ -762,9 +876,8 @@ if(isset($_GET['trackerID']) && $_GET['trackerID'] != '' && strlen($_GET['tracke
 
 					return true;
 				}
-
 				/**
-				* Toggle to display or hide icons for markers
+				* Adds two numbers
 				*/
 				function showHideMarkers(){
 					console.log("showHideMarkers : INIT");
@@ -783,97 +896,18 @@ if(isset($_GET['trackerID']) && $_GET['trackerID'] != '' && strlen($_GET['tracke
 						return true;
 					}
 				}
-
+				
 				/**
-				* reset zoom to stored level at initial load/display
-				*/
-				function resetZoom(){
-					console.log("resetZoom : INIT");
-					mymap.setView(default_center, default_zoom);
-					return false;
-				}
-
-				function drawAltitudeChart(){
-
-				}
-
-				function drawVelocityChart(){
-
-				}
-
-
-///// DATA HANDLERS
-				/**
-				* get the markers data from RPC and fires drawMap function if success
-				*/
-				function getMarkers(){
-					console.log("getMarkers : INIT");
-
-					//ajax call to get list of markers
-					$.ajax({
-				        url: 'rpc.php',
-				        data: {
-				        	'dateFrom': dateFrom.format('YYYY-MM-DD'),
-				        	'dateTo': dateTo.format('YYYY-MM-DD'),
-				        	'accuracy': accuracy,
-				        	//'trackerID' : trackerID,
-				        	//'epoc': time(),
-				        	'action': 'getMarkers'
-				        },
-				        type: 'GET',
-        				dataType: 'json',
-        				beforeSend: function(xhr)
-        				{
-        					$('#mapid').css('filter','blur(5px)');
-        				},
-				        success: function(data, status)
-				        {
-				            if(data.status){
-
-								jsonMarkers = JSON.parse(data.markers);
-
-								if(handleMarkersData(jsonMarkers)){ $('#mapid').css('filter','blur(0px)'); }
-
-				        	}else{
-				        		console.log("getMarkers : ERROR Status : " + status);
-				        		console.log("getMarkers : ERROR Data : ");
-				        		console.log(data);
-				        	}
-				        },
-				        error: function(xhr, desc, err) {
-					        console.log(xhr);
-					        console.log("getMarkers : ERROR Details: " + desc + "\nError:" + err);
-				        }
-				    });
-
-				}
-
-				/* Call-back function following ajax call to get markers (json decoded)
-				*/
-				function handleMarkersData(_tid_markers){
-
-					drawMap(_tid_markers);
-
-					drawVelocityChart(_tid_markers);
-					drawAltitudeChart(_tid_markers);
-
-					updateTrackerIDs(_tid_markers);
-					updateNavbarUI();
-
-					return true;
-
-				}
-
-				/**
-				* get human readable location information for a specific location marker
+				* Adds two numbers
+				* @param {Number} a 
 				*/
 				function geodecodeMarker(i){
 					console.log("geodecodeMarker : INIT");
-
+					
 					console.log("geodecodeMarker : INFO Geodecoding marker #" + i);
-
+						
 					//ajax call to remove marker from backend
-					$.ajax({
+					$.ajax({ 
 				        url: 'rpc.php',
 				        data: {
 				        	'epoch': markers[i].epoch,
@@ -884,13 +918,13 @@ if(isset($_GET['trackerID']) && $_GET['trackerID'] != '' && strlen($_GET['tracke
 				        success: function(data, status)
 				        {
 				            if(data.status){
-
+				            	
 				            	console.log("geodecodeMarker : INFO Status : " + status);
 				        		console.log("geodecodeMarker : INFO Data : " + data);
-
+				        		
 						        //update marker data
-						        $('#loc_'+i).html("<a role='button' onclick='showBoundingBox("+ i +");' title='Show location bounding box' >" + data.location + "</a>");
-
+						        $('#loc_'+i).html("<a href='javascript:showBoundingBox("+ i +");' title='Show location bounding box' >" + data.location + "</a>");
+								
 				        	}else{
 				        		console.log("geodecodeMarker : ERROR Status : " + status);
 				        		console.log("geodecodeMarker : ERROR Data : " + data);
@@ -901,21 +935,22 @@ if(isset($_GET['trackerID']) && $_GET['trackerID'] != '' && strlen($_GET['tracke
 					        console.log("geodecodeMarker : ERROR Details: " + desc + "\nError:" + err);
 				        }
 				    });
-
+					
 				}
-
+				
 				/**
-				* removes marker from map & deletes from DB
+				* Adds two numbers
+				* @param {Number} a 
 				*/
 				function deleteMarker(tid, i){
 					console.log("deleteMarker : INIT tid = "+tid+" i = "+i);
-
-
+					
+					
 					if(confirm('Do you really want to permanently delete marker ?')){
 						console.log("deleteMarker : INFO Removing marker #" + i);
-
+						
 						//ajax call to remove marker from backend
-						$.ajax({
+						$.ajax({ 
 					        url: 'rpc.php',
 					        data: {
 					        	'epoch': tid_markers[tid][i].epoch,
@@ -928,8 +963,9 @@ if(isset($_GET['trackerID']) && $_GET['trackerID'] != '' && strlen($_GET['tracke
 					            if(data.status){
 							        //removing element from JS array
 									tid_markers[tid].splice(i, 1);
-
-
+									
+									//redraw map from scratch
+									eraseMap();
 									drawMap();
 					        	}else{
 					        		console.log("deleteMarker : ERROR Status : " + status);
@@ -943,24 +979,28 @@ if(isset($_GET['trackerID']) && $_GET['trackerID'] != '' && strlen($_GET['tracke
 					    });
 					}
 				}
-
+				
 				/**
-				* displays the bounding box around a location data
+				* Adds two numbers
+				* @param {Number} a 
 				*/
 				function showBoundingBox(i){
 					console.log("showBoundingBox : INIT i = "+i);
-
-
-
+					
+					
+					
 				}
-
+				
+				/**
+				* Adds two numbers
+				*/
+				function resetZoom(){
+					console.log("resetZoom : INIT");
+					mymap.setView(default_center, default_zoom);
+					return false;
+				}
+				
 			</script>
-		</div>
-		<div class="container">
-
-			<div id="mapid"></div>
-			<div id="velocityChart"></div>
-			<div id="altitudeChart"></div>
 		</div>
 	</body>
 </html>

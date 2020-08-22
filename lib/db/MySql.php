@@ -9,6 +9,22 @@ class MySql extends AbstractDb
         $this->db = new \mysqli($hostname, $username, $password, $db);
         $this->prefix = $prefix;
     }
+    // The following function free us from requiring mysqlnd
+    public function get_result($Statement)
+    {
+        $RESULT = array();
+        $Statement->store_result();
+        for ($i = 0; $i < $Statement->num_rows; $i++) {
+            $Metadata = $Statement->result_metadata();
+            $PARAMS = array();
+            while ($Field = $Metadata->fetch_field()) {
+                $PARAMS[] = &$RESULT[ $i ][ $Field->name ];
+            }
+            call_user_func_array(array( $Statement, 'bind_result' ), $PARAMS);
+            $Statement->fetch();
+        }
+        return $RESULT;
+    }
 
     private function prepareStmt(string $sql, array $params)
     {
@@ -47,13 +63,15 @@ class MySql extends AbstractDb
         if (!$stmt->execute()) {
             return false;
         }
-        $dbresult = $stmt->get_result();
-
+        $dbresult = get_result($stmt);
+        
         $result = array();
-        while ($data = $dbresult->fetch_assoc()) {
+        //while ($data = $dbresult) {
             // Loop through results here $data[]
-            $result[] = $data;
-        }
+        //    $result[] = $data;
+        //}
+        $result = $dbresult;
+
 
         $stmt->close();
         return $result;
