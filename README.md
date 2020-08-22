@@ -4,7 +4,7 @@ Besides the below comments of the original creator:
 I mixed this code with peaces of https://github.com/jerry1970/php-owntracks-recorder and https://github.com/balu-/php-owntracks-recorder and https://github.com/danmed/php-owntracks-recorder.
 Besides that I added my own stuff to make it work after my own needs.
 
-I use the code in combination with the opensource version of Owntracks that does not require google play services: NextTracks (https://codeberg.org/nexttracks/android)
+I use the code in combination with the google less version of Owntracks that does not require google play services: NextTracks (https://codeberg.org/nexttracks/android)
 --------------
 
 A simple and responsive self-hosted solution to record and map [Owntracks](https://owntracks.org/) [http payloads](http://owntracks.org/booklet/tech/http/) or [Overland](https://overland.p3k.app/) [payloads](https://github.com/aaronpk/Overland-iOS#api).
